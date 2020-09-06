@@ -3,3 +3,6 @@
 *.iws
 *.iml
 *.ipr
+/explorecali/.mvn/
+/explorecali/mvnw
+/explorecali/mvnw.cmd
