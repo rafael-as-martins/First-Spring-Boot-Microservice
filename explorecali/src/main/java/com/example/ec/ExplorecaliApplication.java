@@ -1,11 +1,7 @@
 package com.example.ec;
 
-import com.example.ec.domain.Difficulty;
-import com.example.ec.domain.Region;
 import com.example.ec.service.TourPackageService;
 import com.example.ec.service.TourService;
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +13,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.ANY;
+import static com.fasterxml.jackson.annotation.PropertyAccessor.FIELD;
 
 @SpringBootApplication
 public class ExplorecaliApplication implements CommandLineRunner {
@@ -29,28 +29,25 @@ public class ExplorecaliApplication implements CommandLineRunner {
     private final TourService tourService;
 
     @Autowired
-    public ExplorecaliApplication(TourService tourService, TourPackageService tourPackageService) {
-        this.tourService = tourService;
+    public ExplorecaliApplication(TourPackageService tourPackageService, TourService tourService) {
         this.tourPackageService = tourPackageService;
+        this.tourService = tourService;
     }
 
     public static void main(String[] args) {
         SpringApplication.run(ExplorecaliApplication.class, args);
     }
 
-
-    private void createTours() throws IOException {
-
-        TourFromFile.read(importFile).forEach(tour ->
-                tourService.createTour(tour.getTitle(), tour.getDescription(),
-                               tour.getBlurb(), tour.getPrice(), tour.getBullets(),
-                               tour.getKeywords(), tour.getPackageType(), tour.getDifficulty(),
-                               (tour.getRegion().isPresent()) ? tour.getRegion().get() : null));
-
-
+    @Override
+    public void run(String... args) throws Exception {
+        createTourAllPackages();
+        createTours(importFile);
     }
 
-    private void createTourPackages() {
+    /**
+     * Initialize all the known tour packages
+     */
+    private void createTourAllPackages(){
         tourPackageService.createTourPackage("BC", "Backpack Cal");
         tourPackageService.createTourPackage("CC", "California Calm");
         tourPackageService.createTourPackage("CH", "California Hot springs");
@@ -62,73 +59,56 @@ public class ExplorecaliApplication implements CommandLineRunner {
         tourPackageService.createTourPackage("TC", "Taste of California");
     }
 
-    @Override
-    public void run(String... args) throws Exception {
-
-        createTourPackages();
-        long numOfPackages = tourPackageService.total();
-
-        createTours();
-        long numOfTours = tourService.total();
-
+    /**
+     * Create tour entities from an external file
+     */
+    private void createTours(String fileToImport) throws IOException {
+        TourFromFile.read(fileToImport).forEach(tourFromFile ->
+                tourService.createTour(tourFromFile.getTitle(),
+                        tourFromFile.getPackageName(), tourFromFile.getDetails())
+        );
     }
 
-    protected static class TourFromFile {
+    /**
+     * Helper class to import ExploreCalifornia.json for a MongoDb Document.
+     * Only interested in the title and package name, the remaining fields
+     * are a collection of key-value pairs
+     *
+     */
+    private static class TourFromFile {
+        //fields
+        String title;
+        String packageName;
+        Map<String, String> details;
 
-        private String packageType, title, description,
-                blurb, price, length, bullets, keywords,
-                difficulty, region;
-
-        protected TourFromFile() {
+        TourFromFile(Map<String, String> record) {
+            this.title =  record.get("title");
+            this.packageName = record.get("packageType");
+            this.details = record;
+            this.details.remove("packageType");
+            this.details.remove("title");
         }
 
+        //reader
         static List<TourFromFile> read(String fileToImport) throws IOException {
-
-            return new ObjectMapper().setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
-                    .readValue(new FileInputStream(fileToImport), new TypeReference<>() {
-                    });
-
-        }
-
-        String getPackageType() {
-            return packageType;
+            List<Map<String, String>> records = new ObjectMapper().setVisibility(FIELD, ANY).
+                    readValue(new FileInputStream(fileToImport),
+                            new TypeReference<>() {
+                            });
+            return records.stream().map(TourFromFile::new)
+                    .collect(Collectors.toList());
         }
 
         String getTitle() {
             return title;
         }
 
-        String getDescription() {
-            return description;
+        String getPackageName() {
+            return packageName;
         }
 
-        String getBlurb() {
-            return blurb;
+        Map<String, String> getDetails() {
+            return details;
         }
-
-        Integer getPrice() {
-            return Integer.parseInt(price);
-        }
-
-        String getLength() {
-            return length;
-        }
-
-        String getBullets() {
-            return bullets;
-        }
-
-        String getKeywords() {
-            return keywords;
-        }
-
-        Difficulty getDifficulty() {
-            return Difficulty.valueOf(difficulty);
-        }
-
-        Optional<Region> getRegion() {
-            return Region.findByLabel(region);
-        }
-
     }
 }

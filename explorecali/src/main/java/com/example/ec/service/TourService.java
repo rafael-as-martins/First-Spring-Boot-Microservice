@@ -1,13 +1,13 @@
 package com.example.ec.service;
 
-import com.example.ec.domain.Difficulty;
-import com.example.ec.domain.Region;
 import com.example.ec.domain.Tour;
 import com.example.ec.domain.TourPackage;
 import com.example.ec.repo.TourPackageRepository;
 import com.example.ec.repo.TourRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 @Service
 public class TourService {
@@ -21,30 +21,22 @@ public class TourService {
         this.tourPackageRepository = tourPackageRepository;
     }
 
+
     /**
      *
-     * Creates a tour Object and saves it in DB
+     * Creates a tour
      *
-     * @param title field
-     * @param description field
-     * @param blurb field
-     * @param price field
-     * @param bullets field
-     * @param keywords field
-     * @param tourPackageName field
-     * @param difficulty field
-     * @param region field
-     *
-     * @return the created Tour
+     * @param title
+     * @param tourPackageName
+     * @param details
+     * @return
      */
-    public Tour createTour(String title, String description, String blurb, Integer price,
-                           String bullets, String keywords, String tourPackageName,
-                           Difficulty difficulty, Region region){
+    public Tour createTour(String title, String tourPackageName, Map<String, String> details){
 
         TourPackage tourPackage = this.tourPackageRepository.findByName(tourPackageName)
                                     .orElseThrow(() -> new RuntimeException("Tour Package doesn't exist with :" + tourPackageName));
 
-        return this.tourRepository.save(new Tour(title, description, blurb, price, bullets, keywords, tourPackage, difficulty, region));
+        return this.tourRepository.save(new Tour(title, tourPackage, details));
 
     }
 
